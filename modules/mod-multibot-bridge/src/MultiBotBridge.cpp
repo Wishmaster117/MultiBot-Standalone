@@ -44,14 +44,21 @@ std::pair<std::string, std::string> SplitOnce(std::string const& value, char sep
     return {value.substr(0, pos), value.substr(pos + 1)};
 }
 
-bool TryExtractBridgePayload(std::string const& msg, std::string& payload)
+bool TryExtractBridgePayload(uint32 lang, std::string const& msg, std::string& payload)
 {
-    if (msg.rfind(kAddonPrefix, 0) != 0)
+    if (lang != LANG_ADDON)
         return false;
 
-    payload = msg.substr(std::char_traits<char>::length(kAddonPrefix));
-    while (!payload.empty() && (payload.front() == '\t' || payload.front() == ' '))
-        payload.erase(payload.begin());
+    payload = Trim(msg);
+    if (payload.empty())
+        return false;
+
+    if (payload.rfind(kAddonPrefix, 0) == 0)
+    {
+        payload.erase(0, std::char_traits<char>::length(kAddonPrefix));
+        while (!payload.empty() && (payload.front() == '	' || payload.front() == ' '))
+            payload.erase(payload.begin());
+    }
 
     return !payload.empty();
 }
@@ -177,6 +184,41 @@ std::string BuildStatePayload(Player* player, std::string const& botName)
     return out.str();
 }
 
+std::string BuildStatesPayload(Player* player)
+{
+    PlayerbotMgr* const mgr = sPlayerbotsMgr.GetPlayerbotMgr(player);
+    if (!mgr)
+        return "";
+
+    std::ostringstream out;
+    bool first = true;
+
+    for (PlayerBotMap::const_iterator it = mgr->GetPlayerBotsBegin(); it != mgr->GetPlayerBotsEnd(); ++it)
+    {
+        Player* const bot = it->second;
+        if (!bot)
+            continue;
+
+        PlayerbotAI* const botAI = sPlayerbotsMgr.GetPlayerbotAI(bot);
+        std::string combatStrategies;
+        std::string nonCombatStrategies;
+        if (botAI)
+        {
+            combatStrategies = JoinStrategies(botAI->GetStrategies(BOT_STATE_COMBAT));
+            nonCombatStrategies = JoinStrategies(botAI->GetStrategies(BOT_STATE_NON_COMBAT));
+        }
+
+        if (!first)
+            out << ';';
+        first = false;
+
+        out << bot->GetName() << kFieldSeparator << combatStrategies << kFieldSeparator << nonCombatStrategies;
+    }
+
+    return out.str();
+}
+
+
 bool HandleBridgeOpcode(Player* player, ChatMsg replyType, std::string const& opcode, std::string const& payload)
 {
     std::string const normalized = ToUpper(Trim(opcode));
@@ -210,6 +252,12 @@ bool HandleBridgeOpcode(Player* player, ChatMsg replyType, std::string const& op
             return true;
         }
 
+        if (requestType == "STATES")
+        {
+            SendAddonPacket(player, replyType, "STATES", BuildStatesPayload(player));
+            return true;
+        }
+
         return false;
     }
 
@@ -221,13 +269,13 @@ class MultiBotBridgePlayerScript final : public PlayerScript
 public:
     MultiBotBridgePlayerScript() : PlayerScript("MultiBotBridgePlayerScript") {}
 
-    bool TryHandle(Player* player, uint32 type, uint32 /*lang*/, std::string& msg)
+    bool TryHandle(Player* player, uint32 type, uint32 lang, std::string& msg)
     {
         if (!player)
             return false;
 
         std::string payload;
-        if (!TryExtractBridgePayload(msg, payload))
+        if (!TryExtractBridgePayload(lang, msg, payload))
             return false;
 
         LOG_INFO("playerbots", "MultiBotBridge RX [{}] type={}", payload, type);
