@@ -4,6 +4,7 @@
 #include "PlayerbotAI.h"
 #include "ChatHelper.h"
 #include "ScriptMgr.h"
+#include "SpellMgr.h"
 #include "ScriptedGossip.h"
 #include "WorldPacket.h"
 
@@ -11,6 +12,7 @@
 #include <map>
 #include <cctype>
 #include <sstream>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -96,6 +98,65 @@ struct InventorySummaryData
     uint32 bagUsed = 0;
     uint32 bagTotal = 16;
 };
+
+struct SpellbookEntryData
+{
+    uint32 spellId = 0;
+    uint32 schoolMask = 0;
+    std::string spellName;
+};
+
+static bool CompareSpellbookEntries(SpellbookEntryData const& left, SpellbookEntryData const& right)
+{
+    if (left.schoolMask != right.schoolMask)
+        return left.schoolMask > right.schoolMask;
+
+    if (left.spellName != right.spellName)
+        return left.spellName > right.spellName;
+
+    return left.spellId < right.spellId;
+}
+
+std::vector<SpellbookEntryData> BuildSpellbookEntries(Player* bot)
+{
+    std::vector<SpellbookEntryData> entries;
+    if (!bot)
+        return entries;
+
+    std::set<std::string> seenNames;
+
+    for (PlayerSpellMap::const_iterator it = bot->GetSpellMap().begin(); it != bot->GetSpellMap().end(); ++it)
+    {
+        if (!it->second)
+            continue;
+
+        if (it->second->State == PLAYERSPELL_REMOVED || !it->second->Active)
+            continue;
+
+        if (!(it->second->specMask & bot->GetActiveSpecMask()))
+            continue;
+
+        SpellInfo const* const spellInfo = sSpellMgr->GetSpellInfo(it->first);
+        if (!spellInfo || spellInfo->IsPassive() || !spellInfo->SpellName[0])
+            continue;
+
+        std::string const spellName = spellInfo->SpellName[0];
+        if (spellName.empty())
+            continue;
+
+        if (!seenNames.insert(spellName).second)
+            continue;
+
+        SpellbookEntryData entry;
+        entry.spellId = it->first;
+        entry.schoolMask = spellInfo->SchoolMask;
+        entry.spellName = spellName;
+        entries.push_back(entry);
+    }
+
+    std::sort(entries.begin(), entries.end(), CompareSpellbookEntries);
+    return entries;
+}
 
 InventorySummaryData BuildInventorySummary(Player* bot)
 {
@@ -200,6 +261,31 @@ void SendInventorySnapshot(Player* requester, ChatMsg replyType, std::string con
     }
 
     SendAddonPacket(requester, replyType, "INV_END", bot->GetName() + std::string(1, kFieldSeparator) + requestToken);
+}
+
+void SendSpellbookSnapshot(Player* requester, ChatMsg replyType, std::string const& botName, std::string const& requestToken)
+{
+    std::string const trimmedBotName = Trim(botName);
+    Player* const bot = FindBotByName(requester, trimmedBotName);
+
+    std::string const prefixPayload = trimmedBotName + std::string(1, kFieldSeparator) + requestToken;
+    SendAddonPacket(requester, replyType, "SB_BEGIN", prefixPayload);
+
+    if (!bot)
+    {
+        SendAddonPacket(requester, replyType, "SB_END", prefixPayload);
+        return;
+    }
+
+    std::vector<SpellbookEntryData> const entries = BuildSpellbookEntries(bot);
+    for (SpellbookEntryData const& entry : entries)
+    {
+        std::ostringstream payload;
+        payload << bot->GetName() << kFieldSeparator << requestToken << kFieldSeparator << entry.spellId;
+        SendAddonPacket(requester, replyType, "SB_ITEM", payload.str());
+    }
+
+    SendAddonPacket(requester, replyType, "SB_END", bot->GetName() + std::string(1, kFieldSeparator) + requestToken);
 }
 
 ChatMsg NormalizeReplyChatType(uint32 type)
@@ -401,6 +487,13 @@ bool HandleBridgeOpcode(Player* player, ChatMsg replyType, std::string const& op
         {
             std::pair<std::string, std::string> const inventoryRequest = SplitOnce(request.second, kFieldSeparator);
             SendInventorySnapshot(player, replyType, inventoryRequest.first, Trim(inventoryRequest.second));
+            return true;
+        }
+
+        if (requestType == "SPELLBOOK")
+        {
+            std::pair<std::string, std::string> const spellbookRequest = SplitOnce(request.second, kFieldSeparator);
+            SendSpellbookSnapshot(player, replyType, spellbookRequest.first, Trim(spellbookRequest.second));
             return true;
         }
 
