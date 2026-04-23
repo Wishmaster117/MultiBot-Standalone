@@ -2,7 +2,8 @@
 std = "lua53"
 
 exclude_files = {
-   "**/MultiBotInit.lua"
+   "**/MultiBotInit.lua",
+   "Libs/**"
 }
 
 globals = {
@@ -27,7 +28,8 @@ globals = {
 	"GetMacroIconInfo", "GetPlayerInfoByGUID", "UnitGUID", "ConvertToRaid", "HandleQuestsAllResponse", "UnitXPMax", "UnitXP", "UnitManaMax", "UnitMana",
 	"GetCurrentMapContinent", "GetCurrentMapAreaID", "SLASH_MULTIBOT1", "SLASH_MULTIBOT2", "SLASH_MULTIBOT3", "SLASH_MULTIBOTOPTIONS1", "SLASH_MBFAKEGM1",
 	"SLASH_MBCLASS1", "SLASH_MBCLASSTEST1", "UIDropDownMenu_SetText", "UIDropDownMenu_SetWidth", "UIDropDownMenu_Initialize", "UIDropDownMenu_CreateInfo",
-    "UIDropDownMenu_AddButton", "UIDropDownMenu_SetSelectedValue", "time", "isFav", "ToggleDropDownMenu"
+    "UIDropDownMenu_AddButton", "UIDropDownMenu_SetSelectedValue", "time", "isFav", "ToggleDropDownMenu", "LibStub", "SendAddonMessage", "WorldFrame", "GetMouseFocus",
+	"IsShiftKeyDown", "RAID_CLASS_COLORS", "ITEM", "UISpecialFrames", "IsControlKeyDown", "IsShiftKeyDown", "INV_SLOT_MAINHAND", "LoadAddOn", "ShowUIPanel", "HandleModifiedItemClick"
 	
 }
 
