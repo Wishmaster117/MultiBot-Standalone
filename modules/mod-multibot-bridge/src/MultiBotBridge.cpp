@@ -34,6 +34,7 @@ bool BridgeConsoleLogsEnabled()
 
 Player* FindBotByName(Player* player, std::string const& botName);
 void SendAddonPacket(Player* player, ChatMsg chatType, std::string const& opcode, std::string const& payload = "");
+uint32 GetPct(uint32 current, uint32 max);
 
 std::string Trim(std::string const& value)
 {
@@ -106,6 +107,20 @@ struct InventorySummaryData
     uint32 copper = 0;
     uint32 bagUsed = 0;
     uint32 bagTotal = 16;
+};
+
+struct StatsData
+{
+    std::string name;
+    uint32 level = 0;
+    uint32 gold = 0;
+    uint32 silver = 0;
+    uint32 copper = 0;
+    uint32 bagUsed = 0;
+    uint32 bagTotal = 0;
+    uint32 durabilityPct = 0;
+    uint32 xpPct = 0;
+    uint32 manaPct = 0;
 };
 
 struct SpellbookEntryData
@@ -480,6 +495,92 @@ InventorySummaryData BuildInventorySummary(Player* bot)
     return summary;
 }
 
+uint32 BuildDurabilityPct(Player* bot)
+{
+    if (!bot)
+        return 0;
+
+    uint32 current = 0;
+    uint32 maximum = 0;
+
+    for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+    {
+        Item* const item = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+        if (!item)
+            continue;
+
+        uint32 const itemMax = item->GetUInt32Value(ITEM_FIELD_MAXDURABILITY);
+        if (!itemMax)
+            continue;
+
+        uint32 const itemCurrent = item->GetUInt32Value(ITEM_FIELD_DURABILITY);
+        maximum += itemMax;
+        current += std::min(itemCurrent, itemMax);
+    }
+
+    if (!maximum)
+        return 100;
+
+    return std::min<uint32>(100, (current * 100u) / maximum);
+}
+
+uint32 BuildXpPct(Player* bot)
+{
+    if (!bot)
+        return 0;
+
+    uint32 const nextLevelXp = bot->GetUInt32Value(PLAYER_NEXT_LEVEL_XP);
+    if (!nextLevelXp)
+        return 0;
+
+    return std::min<uint32>(100, (bot->GetUInt32Value(PLAYER_XP) * 100u) / nextLevelXp);
+}
+
+StatsData BuildStatsData(Player* bot)
+{
+    StatsData data;
+    if (!bot)
+        return data;
+
+    data.name = bot->GetName();
+    data.level = bot->GetLevel();
+
+    uint32 const money = bot->GetMoney();
+    data.gold = money / 10000;
+    data.silver = (money % 10000) / 100;
+    data.copper = money % 100;
+
+    InventorySummaryData const inventory = BuildInventorySummary(bot);
+    data.bagUsed = inventory.bagUsed;
+    data.bagTotal = inventory.bagTotal;
+    data.durabilityPct = BuildDurabilityPct(bot);
+    data.xpPct = BuildXpPct(bot);
+    data.manaPct = GetPct(bot->GetPower(POWER_MANA), bot->GetMaxPower(POWER_MANA));
+
+    return data;
+}
+
+std::string BuildStatsPayload(Player* bot)
+{
+    StatsData const data = BuildStatsData(bot);
+    if (data.name.empty())
+        return "";
+
+    std::ostringstream out;
+    out << UrlEncodeField(data.name)
+        << kFieldSeparator << data.level
+        << kFieldSeparator << data.gold
+        << kFieldSeparator << data.silver
+        << kFieldSeparator << data.copper
+        << kFieldSeparator << data.bagUsed
+        << kFieldSeparator << data.bagTotal
+        << kFieldSeparator << data.durabilityPct
+        << kFieldSeparator << data.xpPct
+        << kFieldSeparator << data.manaPct;
+
+    return out.str();
+}
+
 void SendInventorySnapshot(Player* requester, ChatMsg replyType, std::string const& botName, std::string const& requestToken)
 {
     std::string const trimmedBotName = Trim(botName);
@@ -795,6 +896,32 @@ void SendStatePackets(Player* player, ChatMsg replyType)
         SendAddonPacket(player, replyType, "STATES", "");
 }
 
+std::string BuildStatsPayload(Player* player, std::string const& botName)
+{
+    Player* const bot = FindBotByName(player, botName);
+    if (!bot)
+        return "";
+
+    return BuildStatsPayload(bot);
+}
+
+void SendStatsPackets(Player* player, ChatMsg replyType)
+{
+    PlayerbotMgr* const mgr = sPlayerbotsMgr.GetPlayerbotMgr(player);
+    if (!mgr)
+        return;
+
+    for (PlayerBotMap::const_iterator it = mgr->GetPlayerBotsBegin(); it != mgr->GetPlayerBotsEnd(); ++it)
+    {
+        Player* const bot = it->second;
+        if (!bot)
+            continue;
+
+        std::string const payload = BuildStatsPayload(bot);
+        if (!payload.empty())
+            SendAddonPacket(player, replyType, "STATS", payload);
+    }
+}
 
 bool HandleBridgeOpcode(Player* player, ChatMsg replyType, std::string const& opcode, std::string const& payload)
 {
@@ -854,6 +981,17 @@ bool HandleBridgeOpcode(Player* player, ChatMsg replyType, std::string const& op
                 SendPvpStatsPackets(player, replyType);
             else
                 SendAddonPacket(player, replyType, "PVP_STATS", BuildPvpStatsPayload(player, botName));
+
+            return true;
+        }
+
+        if (requestType == "STATS")
+        {
+            std::string const botName = Trim(request.second);
+            if (botName.empty())
+                SendStatsPackets(player, replyType);
+            else
+                SendAddonPacket(player, replyType, "STATS", BuildStatsPayload(player, botName));
 
             return true;
         }
