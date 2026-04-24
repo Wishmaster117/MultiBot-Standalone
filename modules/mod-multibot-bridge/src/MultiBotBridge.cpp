@@ -1,5 +1,6 @@
 #include "Chat.h"
 #include "Config.h"
+#include "DatabaseEnv.h"
 #include "DBCStores.h"
 #include "Player.h"
 #include "PlayerbotMgr.h"
@@ -123,6 +124,21 @@ struct BotDetailData
     uint32 level = 0;
     std::array<uint32, 3> talentTabs = {0, 0, 0};
     uint32 itemLevelScore = 0;
+};
+
+struct PvpStatsData
+{
+    std::string name;
+    uint32 arenaPoints = 0;
+    uint32 honorPoints = 0;
+
+    struct TeamData
+    {
+        std::string name;
+        uint32 rating = 0;
+    };
+
+    std::array<TeamData, 3> teams;
 };
 
 std::string GetRaceName(uint8 raceId)
@@ -300,6 +316,77 @@ std::string BuildBotDetailPayload(Player* bot)
         << UrlEncodeField(detail.gender) << kFieldSeparator << UrlEncodeField(detail.className) << kFieldSeparator
         << detail.level << kFieldSeparator << detail.talentTabs[0] << kFieldSeparator << detail.talentTabs[1]
         << kFieldSeparator << detail.talentTabs[2] << kFieldSeparator << detail.itemLevelScore;
+    return out.str();
+}
+
+uint8 ArenaTeamTypeToPayloadIndex(uint8 type)
+{
+    switch (type)
+    {
+        case 2:
+            return 0;
+        case 3:
+            return 1;
+        case 5:
+            return 2;
+        default:
+            return 3;
+    }
+}
+
+PvpStatsData BuildPvpStatsData(Player* bot)
+{
+    PvpStatsData data;
+    if (!bot)
+        return data;
+
+    data.name = bot->GetName();
+    data.arenaPoints = bot->GetArenaPoints();
+    data.honorPoints = bot->GetHonorPoints();
+
+    QueryResult result = CharacterDatabase.Query(
+        "SELECT at.type, at.name, at.rating "
+        "FROM arena_team_member atm "
+        "INNER JOIN arena_team at ON at.arenaTeamId = atm.arenaTeamId "
+        "WHERE atm.guid = {}",
+        bot->GetGUID().GetCounter());
+
+    if (!result)
+        return data;
+
+    do
+    {
+        Field* const fields = result->Fetch();
+        uint8 const type = fields[0].Get<uint8>();
+        uint8 const index = ArenaTeamTypeToPayloadIndex(type);
+        if (index >= data.teams.size())
+            continue;
+
+        data.teams[index].name = fields[1].Get<std::string>();
+        data.teams[index].rating = fields[2].Get<uint32>();
+    }
+    while (result->NextRow());
+
+    return data;
+}
+
+std::string BuildPvpStatsPayload(Player* bot)
+{
+    PvpStatsData const data = BuildPvpStatsData(bot);
+    if (data.name.empty())
+        return "";
+
+    std::ostringstream out;
+    out << UrlEncodeField(data.name)
+        << kFieldSeparator << data.arenaPoints
+        << kFieldSeparator << data.honorPoints;
+
+    for (PvpStatsData::TeamData const& team : data.teams)
+    {
+        out << kFieldSeparator << UrlEncodeField(team.name)
+            << kFieldSeparator << team.rating;
+    }
+
     return out.str();
 }
 
@@ -629,6 +716,33 @@ std::string BuildDetailPayload(Player* player, std::string const& botName)
     return BuildBotDetailPayload(bot);
 }
 
+std::string BuildPvpStatsPayload(Player* player, std::string const& botName)
+{
+    Player* const bot = FindBotByName(player, botName);
+    if (!bot)
+        return "";
+
+    return BuildPvpStatsPayload(bot);
+}
+
+void SendPvpStatsPackets(Player* player, ChatMsg replyType)
+{
+    PlayerbotMgr* const mgr = sPlayerbotsMgr.GetPlayerbotMgr(player);
+    if (!mgr)
+        return;
+
+    for (PlayerBotMap::const_iterator it = mgr->GetPlayerBotsBegin(); it != mgr->GetPlayerBotsEnd(); ++it)
+    {
+        Player* const bot = it->second;
+        if (!bot)
+            continue;
+
+        std::string const payload = BuildPvpStatsPayload(bot);
+        if (!payload.empty())
+            SendAddonPacket(player, replyType, "PVP_STATS", payload);
+    }
+}
+
 std::string BuildStatePayload(Player* player, std::string const& botName)
 {
     Player* const bot = FindBotByName(player, botName);
@@ -730,6 +844,17 @@ bool HandleBridgeOpcode(Player* player, ChatMsg replyType, std::string const& op
         if (requestType == "STATES")
         {
             SendStatePackets(player, replyType);
+            return true;
+        }
+
+        if (requestType == "PVP_STATS")
+        {
+            std::string const botName = Trim(request.second);
+            if (botName.empty())
+                SendPvpStatsPackets(player, replyType);
+            else
+                SendAddonPacket(player, replyType, "PVP_STATS", BuildPvpStatsPayload(player, botName));
+
             return true;
         }
 
