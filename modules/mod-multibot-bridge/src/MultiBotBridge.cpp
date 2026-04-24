@@ -156,6 +156,13 @@ struct PvpStatsData
     std::array<TeamData, 3> teams;
 };
 
+
+struct QuestEntryData
+{
+    uint32 questId = 0;
+    bool completed = false;
+};
+
 std::string GetRaceName(uint8 raceId)
 {
     switch (raceId)
@@ -403,6 +410,168 @@ std::string BuildPvpStatsPayload(Player* bot)
     }
 
     return out.str();
+}
+
+std::string NormalizeQuestMode(std::string const& mode)
+{
+    std::string normalized = ToUpper(Trim(mode));
+    if (normalized != "INCOMPLETED" && normalized != "COMPLETED" && normalized != "ALL")
+        normalized = "ALL";
+
+    return normalized;
+}
+
+bool ShouldSendQuestForMode(std::string const& mode, bool completed)
+{
+    if (mode == "ALL")
+        return true;
+
+    if (mode == "COMPLETED")
+        return completed;
+
+    return !completed;
+}
+
+void AppendQuestEntry(std::vector<QuestEntryData>& entries, std::set<uint32>& seen, uint32 questId, bool completed, std::string const& mode)
+{
+    if (!questId || seen.find(questId) != seen.end())
+        return;
+
+    if (!ShouldSendQuestForMode(mode, completed))
+        return;
+
+    QuestEntryData entry;
+    entry.questId = questId;
+    entry.completed = completed;
+    entries.push_back(entry);
+    seen.insert(questId);
+}
+
+void SortQuestEntries(std::vector<QuestEntryData>& entries)
+{
+    std::sort(entries.begin(), entries.end(), [](QuestEntryData const& left, QuestEntryData const& right)
+    {
+        return left.questId < right.questId;
+    });
+}
+
+std::vector<QuestEntryData> BuildQuestEntries(Player* bot, std::string const& mode)
+{
+    std::vector<QuestEntryData> entries;
+    std::set<uint32> seen;
+    if (!bot)
+        return entries;
+
+    for (uint16 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+    {
+        uint32 const questId = bot->GetQuestSlotQuestId(slot);
+        if (!questId)
+            continue;
+
+        QuestStatus const status = bot->GetQuestStatus(questId);
+        if (status == QUEST_STATUS_COMPLETE)
+            AppendQuestEntry(entries, seen, questId, true, mode);
+        else if (status == QUEST_STATUS_INCOMPLETE || status == QUEST_STATUS_FAILED)
+            AppendQuestEntry(entries, seen, questId, false, mode);
+    }
+
+    if (!entries.empty())
+    {
+        SortQuestEntries(entries);
+        return entries;
+    }
+
+    // Fallback DB uniquement si le quest log runtime est vide.
+    // Certains forks stockent les quêtes actives avec un statut DB brut 0/1/3,
+    // qui ne correspond pas toujours directement à l'enum runtime QuestStatus.
+
+    QueryResult result = CharacterDatabase.Query(
+        "SELECT quest, status FROM character_queststatus WHERE guid = {}",
+        bot->GetGUID().GetCounter());
+
+    if (!result)
+        return entries;
+
+    do
+    {
+        Field* const fields = result->Fetch();
+        uint32 const questId = fields[0].Get<uint32>();
+        uint8 const status = fields[1].Get<uint8>();
+
+        bool completed = false;
+        if (status == static_cast<uint8>(QUEST_STATUS_COMPLETE) || status == 1)
+            completed = true;
+        else if (status == static_cast<uint8>(QUEST_STATUS_INCOMPLETE) || status == static_cast<uint8>(QUEST_STATUS_FAILED) || status == 0 || status == 3)
+            completed = false;
+        else
+            continue;
+
+        AppendQuestEntry(entries, seen, questId, completed, mode);
+    }
+    while (result->NextRow());
+
+    SortQuestEntries(entries);
+    return entries;
+}
+
+void SendQuestPacketsForBot(Player* requester, ChatMsg replyType, Player* bot, std::string const& mode, std::string const& token)
+{
+    if (!requester || !bot)
+        return;
+
+    std::string const botName = bot->GetName();
+
+    std::string const headerPayload = UrlEncodeField(botName) + std::string(1, kFieldSeparator) + token
+        + std::string(1, kFieldSeparator) + mode;
+    SendAddonPacket(requester, replyType, "QUESTS_BEGIN", headerPayload);
+
+    std::vector<QuestEntryData> const entries = BuildQuestEntries(bot, mode);
+    for (QuestEntryData const& entry : entries)
+    {
+        std::ostringstream payload;
+        payload << UrlEncodeField(botName)
+            << kFieldSeparator << token
+            << kFieldSeparator << mode
+            << kFieldSeparator << (entry.completed ? "C" : "I")
+            << kFieldSeparator << entry.questId
+            << kFieldSeparator << UrlEncodeField(std::to_string(entry.questId));
+
+        SendAddonPacket(requester, replyType, "QUESTS_ITEM", payload.str());
+    }
+
+    SendAddonPacket(requester, replyType, "QUESTS_END", headerPayload);
+}
+
+void SendQuestPackets(Player* player, ChatMsg replyType, std::string const& modeValue, std::string const& botNameValue, std::string const& tokenValue)
+{
+    std::string const mode = NormalizeQuestMode(modeValue);
+    std::string const botName = Trim(botNameValue);
+    std::string const token = Trim(tokenValue);
+
+    if (!botName.empty())
+    {
+        Player* const bot = FindBotByName(player, botName);
+        if (bot)
+            SendQuestPacketsForBot(player, replyType, bot, mode, token);
+
+        SendAddonPacket(player, replyType, "QUESTS_DONE", token + std::string(1, kFieldSeparator) + mode);
+        return;
+    }
+
+    PlayerbotMgr* const mgr = sPlayerbotsMgr.GetPlayerbotMgr(player);
+    if (mgr)
+    {
+        for (PlayerBotMap::const_iterator it = mgr->GetPlayerBotsBegin(); it != mgr->GetPlayerBotsEnd(); ++it)
+        {
+            Player* const bot = it->second;
+            if (!bot)
+                continue;
+
+            SendQuestPacketsForBot(player, replyType, bot, mode, token);
+        }
+    }
+
+    SendAddonPacket(player, replyType, "QUESTS_DONE", token + std::string(1, kFieldSeparator) + mode);
 }
 
 static bool CompareSpellbookEntries(SpellbookEntryData const& left, SpellbookEntryData const& right)
@@ -971,6 +1140,14 @@ bool HandleBridgeOpcode(Player* player, ChatMsg replyType, std::string const& op
         if (requestType == "STATES")
         {
             SendStatePackets(player, replyType);
+            return true;
+        }
+
+        if (requestType == "QUESTS")
+        {
+            std::pair<std::string, std::string> const modeRequest = SplitOnce(request.second, kFieldSeparator);
+            std::pair<std::string, std::string> const botRequest = SplitOnce(modeRequest.second, kFieldSeparator);
+            SendQuestPackets(player, replyType, modeRequest.first, botRequest.first, botRequest.second);
             return true;
         }
 
