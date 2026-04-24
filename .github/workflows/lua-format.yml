@@ -19,8 +19,9 @@ jobs:
         
       - name: Run Stylua format file by file
         run: |
-          find Core Data Features UI Locales Strategies -type f -name "*.lua" -print0 |
+          # depuis la racine du dépôt, formate tous les .lua sous MultiBot
+          find MultiBot -type f -name "*.lua" -print0 |
           while IFS= read -r -d '' file; do
-            echo "➡️ Formating $file"
+            echo "➡️ Formatting $file"
             stylua "$file"
           done
