@@ -9,8 +9,11 @@ User interface for AzerothCore-Module "Playerbots" by Playerbots team https://gi
 Tested with American, German, French and Spanish 3.3.5 Wotlk-Client.
 
 # Installation
-Simply place the files in a folder called "MultiBot" in your World of Warcraft AddOns directory.<br>
-Example: "C:\WorldOfWarcraft\Interface\AddOns\MultiBot"
+Put folder "mod-multibot-bridge" into "\azerothcore-wotlk\modules" where "mod-playerbots" are.
+Compil your server.
+
+After that Simply place the files in a folder called "MultiBot" in your World of Warcraft AddOns directory.<br>
+Example: "DRIVE:\WowClientFolder\Interface\AddOns\MultiBot"
 # Use
 Start World of Warcraft and enter "/multibot" or "/mbot" or "/mb" in the chat, or use the minimap button.
 
