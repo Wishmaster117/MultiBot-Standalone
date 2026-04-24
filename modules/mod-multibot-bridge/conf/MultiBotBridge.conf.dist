@@ -1,2 +1,6 @@
 # MultiBotBridge module configuration
-# This MVP currently has no runtime settings.
+#
+# Enable bridge console logs (RX / TX / startup).
+# 1 = enabled
+# 0 = disabled
+MultiBotBridge.EnableConsoleLogs = 1

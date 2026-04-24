@@ -1,4 +1,6 @@
 #include "Chat.h"
+#include "Config.h"
+#include "DBCStores.h"
 #include "Player.h"
 #include "PlayerbotMgr.h"
 #include "PlayerbotAI.h"
@@ -9,6 +11,7 @@
 #include "WorldPacket.h"
 
 #include <algorithm>
+#include <array>
 #include <map>
 #include <cctype>
 #include <sstream>
@@ -22,6 +25,11 @@ char const* const kAddonPrefix = "MBOT";
 char const* const kBridgeName = "mod-multibot-bridge";
 char const* const kProtocolVersion = "1";
 char const kFieldSeparator = '~';
+
+bool BridgeConsoleLogsEnabled()
+{
+    return sConfigMgr->GetOption<bool>("MultiBotBridge.EnableConsoleLogs", true);
+}
 
 Player* FindBotByName(Player* player, std::string const& botName);
 void SendAddonPacket(Player* player, ChatMsg chatType, std::string const& opcode, std::string const& payload = "");
@@ -105,6 +113,195 @@ struct SpellbookEntryData
     uint32 schoolMask = 0;
     std::string spellName;
 };
+
+struct BotDetailData
+{
+    std::string name;
+    std::string race;
+    std::string gender;
+    std::string className;
+    uint32 level = 0;
+    std::array<uint32, 3> talentTabs = {0, 0, 0};
+    uint32 itemLevelScore = 0;
+};
+
+std::string GetRaceName(uint8 raceId)
+{
+    switch (raceId)
+    {
+        case 1:
+            return "Human";
+        case 2:
+            return "Orc";
+        case 3:
+            return "Dwarf";
+        case 4:
+            return "Night Elf";
+        case 5:
+            return "Undead";
+        case 6:
+            return "Tauren";
+        case 7:
+            return "Gnome";
+        case 8:
+            return "Troll";
+        case 10:
+            return "Blood Elf";
+        case 11:
+            return "Draenei";
+        default:
+            return "Unknown";
+    }
+}
+
+std::string GetClassName(uint8 classId)
+{
+    switch (classId)
+    {
+        case 1:
+            return "Warrior";
+        case 2:
+            return "Paladin";
+        case 3:
+            return "Hunter";
+        case 4:
+            return "Rogue";
+        case 5:
+            return "Priest";
+        case 6:
+            return "DeathKnight";
+        case 7:
+            return "Shaman";
+        case 8:
+            return "Mage";
+        case 9:
+            return "Warlock";
+        case 11:
+            return "Druid";
+        default:
+            return "Unknown";
+    }
+}
+
+uint32 GetTalentRankPoints(TalentEntry const* talentInfo, uint32 spellId)
+{
+    if (!talentInfo)
+        return 1;
+
+    for (uint8 rank = 0; rank < MAX_TALENT_RANK; ++rank)
+    {
+        if (talentInfo->RankID[rank] == spellId)
+            return rank + 1;
+    }
+
+    return 1;
+}
+
+std::array<uint32, 3> BuildTalentTabPoints(Player* bot)
+{
+    std::array<uint32, 3> tabs = {0, 0, 0};
+    if (!bot)
+        return tabs;
+
+    uint8 const activeSpecMask = bot->GetActiveSpecMask();
+
+    for (PlayerTalentMap::const_iterator it = bot->GetTalentMap().begin(); it != bot->GetTalentMap().end(); ++it)
+    {
+        PlayerTalent const* const playerTalent = it->second;
+        if (!playerTalent)
+            continue;
+
+        if (playerTalent->State == PLAYERSPELL_REMOVED)
+            continue;
+
+        if (playerTalent->specMask && !(playerTalent->specMask & activeSpecMask))
+            continue;
+
+        TalentEntry const* const talentInfo = sTalentStore.LookupEntry(playerTalent->talentID);
+        if (!talentInfo)
+            continue;
+
+        TalentTabEntry const* const talentTab = sTalentTabStore.LookupEntry(talentInfo->TalentTab);
+        if (!talentTab || talentTab->tabpage >= tabs.size())
+            continue;
+
+        tabs[talentTab->tabpage] += GetTalentRankPoints(talentInfo, it->first);
+    }
+
+    return tabs;
+}
+
+uint32 BuildItemLevelScore(Player* bot)
+{
+    if (!bot)
+        return 0;
+
+    uint32 score = 0;
+    bool hasMainHand = false;
+    bool mainHandIsTwoHanded = false;
+    bool hasOffHand = false;
+    bool const hasTitanGrip = bot->HasSpell(49152);
+
+    for (uint8 slot = EQUIPMENT_SLOT_START; slot <= EQUIPMENT_SLOT_RANGED; ++slot)
+    {
+        if (slot == EQUIPMENT_SLOT_BODY)
+            continue;
+
+        Item* const item = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+        if (!item)
+            continue;
+
+        ItemTemplate const* const proto = item->GetTemplate();
+        if (!proto)
+            continue;
+
+        if (slot == EQUIPMENT_SLOT_MAINHAND)
+        {
+            hasMainHand = true;
+            mainHandIsTwoHanded = proto->InventoryType == INVTYPE_2HWEAPON;
+        }
+        else if (slot == EQUIPMENT_SLOT_OFFHAND)
+            hasOffHand = true;
+
+        score += proto->ItemLevel;
+    }
+
+    uint32 const divisor = ((hasMainHand && !mainHandIsTwoHanded) || (hasMainHand && hasTitanGrip) || hasOffHand) ? 17 : 16;
+    if (!divisor)
+        return 0;
+
+    return score / divisor;
+}
+
+BotDetailData BuildBotDetail(Player* bot)
+{
+    BotDetailData detail;
+    if (!bot)
+        return detail;
+
+    detail.name = bot->GetName();
+    detail.race = GetRaceName(static_cast<uint8>(bot->getRace()));
+    detail.gender = static_cast<uint8>(bot->getGender()) == 1 ? "Female" : "Male";
+    detail.className = GetClassName(static_cast<uint8>(bot->getClass()));
+    detail.level = bot->GetLevel();
+    detail.talentTabs = BuildTalentTabPoints(bot);
+    detail.itemLevelScore = BuildItemLevelScore(bot);
+    return detail;
+}
+
+std::string BuildBotDetailPayload(Player* bot)
+{
+    BotDetailData const detail = BuildBotDetail(bot);
+    if (detail.name.empty())
+        return "";
+
+    std::ostringstream out;
+    out << UrlEncodeField(detail.name) << kFieldSeparator << UrlEncodeField(detail.race) << kFieldSeparator
+        << UrlEncodeField(detail.gender) << kFieldSeparator << UrlEncodeField(detail.className) << kFieldSeparator
+        << detail.level << kFieldSeparator << detail.talentTabs[0] << kFieldSeparator << detail.talentTabs[1]
+        << kFieldSeparator << detail.talentTabs[2] << kFieldSeparator << detail.itemLevelScore;
+    return out.str();
+}
 
 static bool CompareSpellbookEntries(SpellbookEntryData const& left, SpellbookEntryData const& right)
 {
@@ -313,7 +510,8 @@ void SendAddonPacket(Player* player, ChatMsg chatType, std::string const& opcode
     if (!payload.empty())
         wire += std::string(1, kFieldSeparator) + payload;
 
-    LOG_INFO("playerbots", "MultiBotBridge TX [{}] type={}", wire, static_cast<uint32>(chatType));
+    if (BridgeConsoleLogsEnabled())
+        LOG_INFO("playerbots", "MultiBotBridge TX [{}] type={}", wire, static_cast<uint32>(chatType));
 
     WorldPacket data;
     ChatHandler::BuildChatPacket(data, chatType, LANG_ADDON, player, nullptr, wire.c_str());
@@ -393,6 +591,44 @@ std::string BuildRosterPayload(Player* player)
     return out.str();
 }
 
+void SendDetailPackets(Player* player, ChatMsg replyType)
+{
+    PlayerbotMgr* const mgr = sPlayerbotsMgr.GetPlayerbotMgr(player);
+    if (!mgr)
+    {
+        SendAddonPacket(player, replyType, "DETAILS", "");
+        return;
+    }
+
+    bool sent = false;
+
+    for (PlayerBotMap::const_iterator it = mgr->GetPlayerBotsBegin(); it != mgr->GetPlayerBotsEnd(); ++it)
+    {
+        Player* const bot = it->second;
+        if (!bot)
+            continue;
+
+        std::string const payload = BuildBotDetailPayload(bot);
+        if (payload.empty())
+            continue;
+
+        SendAddonPacket(player, replyType, "DETAIL", payload);
+        sent = true;
+    }
+
+    if (!sent)
+        SendAddonPacket(player, replyType, "DETAILS", "");
+}
+
+std::string BuildDetailPayload(Player* player, std::string const& botName)
+{
+    Player* const bot = FindBotByName(player, botName);
+    if (!bot)
+        return "";
+
+    return BuildBotDetailPayload(bot);
+}
+
 std::string BuildStatePayload(Player* player, std::string const& botName)
 {
     Player* const bot = FindBotByName(player, botName);
@@ -409,15 +645,16 @@ std::string BuildStatePayload(Player* player, std::string const& botName)
     return out.str();
 }
 
-std::string BuildStatesPayload(Player* player)
+void SendStatePackets(Player* player, ChatMsg replyType)
 {
     PlayerbotMgr* const mgr = sPlayerbotsMgr.GetPlayerbotMgr(player);
     if (!mgr)
-        return "";
+    {
+        SendAddonPacket(player, replyType, "STATES", "");
+        return;
+    }    
 
-    std::ostringstream out;
-    bool first = true;
-
+    bool sent = false;
     for (PlayerBotMap::const_iterator it = mgr->GetPlayerBotsBegin(); it != mgr->GetPlayerBotsEnd(); ++it)
     {
         Player* const bot = it->second;
@@ -427,20 +664,21 @@ std::string BuildStatesPayload(Player* player)
         PlayerbotAI* const botAI = sPlayerbotsMgr.GetPlayerbotAI(bot);
         std::string combatStrategies;
         std::string nonCombatStrategies;
+
         if (botAI)
         {
             combatStrategies = JoinStrategies(botAI->GetStrategies(BOT_STATE_COMBAT));
             nonCombatStrategies = JoinStrategies(botAI->GetStrategies(BOT_STATE_NON_COMBAT));
         }
 
-        if (!first)
-            out << ';';
-        first = false;
-
+        std::ostringstream out;
         out << bot->GetName() << kFieldSeparator << combatStrategies << kFieldSeparator << nonCombatStrategies;
+        SendAddonPacket(player, replyType, "STATE", out.str());
+        sent = true;
     }
 
-    return out.str();
+    if (!sent)
+        SendAddonPacket(player, replyType, "STATES", "");
 }
 
 
@@ -471,6 +709,18 @@ bool HandleBridgeOpcode(Player* player, ChatMsg replyType, std::string const& op
             return true;
         }
 
+        if (requestType == "DETAIL")
+        {
+            SendAddonPacket(player, replyType, "DETAIL", BuildDetailPayload(player, request.second));
+            return true;
+        }
+
+        if (requestType == "DETAILS")
+        {
+            SendDetailPackets(player, replyType);
+            return true;
+        }
+
         if (requestType == "STATE")
         {
             SendAddonPacket(player, replyType, "STATE", BuildStatePayload(player, request.second));
@@ -479,7 +729,7 @@ bool HandleBridgeOpcode(Player* player, ChatMsg replyType, std::string const& op
 
         if (requestType == "STATES")
         {
-            SendAddonPacket(player, replyType, "STATES", BuildStatesPayload(player));
+            SendStatePackets(player, replyType);
             return true;
         }
 
@@ -517,7 +767,8 @@ public:
         if (!TryExtractBridgePayload(lang, msg, payload))
             return false;
 
-        LOG_INFO("playerbots", "MultiBotBridge RX [{}] type={}", payload, type);
+        if (BridgeConsoleLogsEnabled())
+            LOG_INFO("playerbots", "MultiBotBridge RX [{}] type={}", payload, type);
 
         std::pair<std::string, std::string> const packet = SplitOnce(payload, kFieldSeparator);
         return HandleBridgeOpcode(player, NormalizeReplyChatType(type), packet.first, packet.second);
@@ -547,6 +798,7 @@ public:
 
 void AddSC_multibot_bridge()
 {
-    LOG_INFO("server.loading", "mod-multibot-bridge loaded");
+    if (BridgeConsoleLogsEnabled())
+        LOG_INFO("server.loading", "mod-multibot-bridge loaded");
     new MultiBotBridgePlayerScript();
 }
