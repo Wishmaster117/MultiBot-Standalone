@@ -1,2 +1,19 @@
 * Recentrer les icones des glyphes
 * Le tooltip des glyphes apparait derrière la frame
+* Mettre un bouton à raidus pour enlever les bots inconnus
+* faire en sorte que la croix de fermeture de quickshamant et quickhunter reste à la même place quand on clique dessus pour les fermer
+* Uniformiser le template des frame quetes comme celle de Itemus
+* Uniformiser le template de la frame reward comme celle de itemus
+* Raidus doit se rafraichir à l'ouverture et fermeture
+* dans la liste des quêtes des fois c'est l'ID de la queête qui apparait et pas le tritre
+* Mettre une option pour choisir la tailles des icones de la main barre et des quickhunter/shaman
+* Voir si il y'a pas d'autres option que l'on peut ajouter à la frame options de multibot
+* creer le multilangue pour le tooltip: setTooltip(self, "Show / Hide / Move Quick Shaman") des fichiers quickshaman et quickhunter
+* Finir les options de déplacement des boutons
+* faire en sorte que les menus déroulants de la main barre se ferment quand on on ouvre un autre
+* revoir le fichiers UI/MultiBotTalent, la partie des glyphes et des talents car il y'a eu des modifications dans le fichiers .conf de multibot
+* pourquoi les glyphes sont longues a afficher?
+* implémenter RTI
+* trouver un moyen de charger tous les skins des pets hunter
+* tester nouvelle commande /mbdebug : "[MB] Usage: /mbdebug list | /mbdebug on | /mbdebug off | /mbdebug toggle | /mbdebug all on|off | /mbdebug counters [reset]"
+* Implémenter Focus
