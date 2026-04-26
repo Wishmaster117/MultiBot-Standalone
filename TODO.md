@@ -1,4 +1,5 @@
 ATTENTION: Nouveau outfit par bridge il faut voire le cas de deux armes deux mains, le bot ne les équipe pas!
+* Passer les gobject dans la bridge
 * Recentrer les icones des glyphes
 * Mettre un bouton à raidus pour enlever les bots inconnus
 * faire en sorte que la croix de fermeture de quickshamant et quickhunter reste à la même place quand on clique dessus pour les fermer
@@ -16,3 +17,18 @@ ATTENTION: Nouveau outfit par bridge il faut voire le cas de deux armes deux mai
 * implémenter RTI
 * trouver un moyen de charger tous les skins des pets hunter
 * Implémenter Focus
+* Implémenter new pull
+
+-- Nouvelles fonctions:
+Gestion des Outfits
+Déséquiper stuff avec right click dans la fenêtre inspect
+Refresh de l'inventaire en live
+Nouvel interface inventaire
+Interface talents améliorée
+Nouvel interface raidus
+Nouvel interface Spellbook
+Unit bare dynamique avec auto colapse
+Nouvelles fonctions de configuration de l'interface
+Auto masquage de la main barre avec reglage du temps
+gestion de profiles UI
+bouton pour cacher les quickshaman et quickHunter
