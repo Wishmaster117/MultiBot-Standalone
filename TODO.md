@@ -1,4 +1,5 @@
 ATTENTION: Nouveau outfit par bridge il faut voire le cas de deux armes deux mains, le bot ne les équipe pas!
+* Mettre dans le readme, que les commandes legacy pour interroger les bots comme co ?, nc ?, ss ?, who.... marchent toujours, le bot réponds
 * Recentrer les icones des glyphes
 * Le tooltip des glyphes apparait derrière la frame
 * Mettre un bouton à raidus pour enlever les bots inconnus
