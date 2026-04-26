@@ -1,3 +1,4 @@
+ATTENTION: Nouveau outfit par bridge il faut voire le cas de deux armes deux mains, le bot ne les équipe pas!
 * Recentrer les icones des glyphes
 * Le tooltip des glyphes apparait derrière la frame
 * Mettre un bouton à raidus pour enlever les bots inconnus
