@@ -1,7 +1,7 @@
 ATTENTION: Nouveau outfit par bridge il faut voire le cas de deux armes deux mains, le bot ne les équipe pas!
 * Passer les gobject dans la bridge
 * Recentrer les icones des glyphes
-* Mettre un bouton à raidus pour enlever les bots inconnus
+* Mettre un bouton à raidus pour enlever les bots inconnus et les virer en même temps de saved variables
 * faire en sorte que la croix de fermeture de quickshamant et quickhunter reste à la même place quand on clique dessus pour les fermer
 * Uniformiser le template des frame quetes comme celle de Itemus
 * Uniformiser le template de la frame reward comme celle de itemus
