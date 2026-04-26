@@ -1,7 +1,5 @@
 ATTENTION: Nouveau outfit par bridge il faut voire le cas de deux armes deux mains, le bot ne les équipe pas!
-* Mettre dans le readme, que les commandes legacy pour interroger les bots comme co ?, nc ?, ss ?, who.... marchent toujours, le bot réponds
 * Recentrer les icones des glyphes
-* Le tooltip des glyphes apparait derrière la frame
 * Mettre un bouton à raidus pour enlever les bots inconnus
 * faire en sorte que la croix de fermeture de quickshamant et quickhunter reste à la même place quand on clique dessus pour les fermer
 * Uniformiser le template des frame quetes comme celle de Itemus
@@ -17,5 +15,4 @@ ATTENTION: Nouveau outfit par bridge il faut voire le cas de deux armes deux mai
 * pourquoi les glyphes sont longues a afficher?
 * implémenter RTI
 * trouver un moyen de charger tous les skins des pets hunter
-* tester nouvelle commande /mbdebug : "[MB] Usage: /mbdebug list | /mbdebug on | /mbdebug off | /mbdebug toggle | /mbdebug all on|off | /mbdebug counters [reset]"
 * Implémenter Focus
