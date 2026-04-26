@@ -3,9 +3,11 @@
 # Breaking News
 MultiBot has been converted to a bridge-first, mostly chatless architecture.
 
-The addon now uses `mod-multibot-bridge` to request structured data from the server instead of relying on automatic legacy chat parsing for the main UI refresh paths. Roster, states, details, stats, inventory, spellbook, glyphs and related UI data are now refreshed through `MBOT GET~...` bridge requests when the bridge is available.
+The addon now uses `mod-multibot-bridge` to request structured data from the server instead of relying on automatic legacy chat parsing for the main UI refresh paths. Roster, states, details, stats, inventory, spellbook, glyphs, outfits and related UI data are now refreshed through `MBOT GET~...` bridge requests when the bridge is available.
 
-Manual playerbot commands are still intentionally preserved for diagnostics and gameplay actions. Outfits are also intentionally kept on the legacy path for now because they do not create heavy spam and will be migrated later.
+Manual playerbot commands are still intentionally preserved for diagnostics and gameplay actions. Commands such as `who`, `co ?`, `nc ?`, `ss ?` and similar manual whispers still work so players can request information about a bot state when they explicitly want it.
+
+Outfits have also been moved to the bridge-first path. Listing, creating/updating, resetting, equipping and replacing outfit sets no longer require automatic chat parsing, and the bridge suppresses the old detailed `Equipping [item] ...` spam while keeping a single readable equip/replace confirmation.
 
 Legacy automatic chat fallback is disabled by default:
 
@@ -82,6 +84,8 @@ Start World of Warcraft and enter `/multibot`, `/mbot`, or `/mb` in the chat, or
 
 The addon will automatically try to connect to `mod-multibot-bridge`. If the bridge is connected, the main UI refresh paths use structured bridge messages instead of legacy chat replies.
 
+Manual bot information commands remain available. You can still whisper/use commands such as `who`, `co ?`, `nc ?`, `ss ?` and similar playerbot diagnostics when you explicitly want to inspect a bot state. The chatless conversion only removes the automatic UI-refresh spam; it does not remove voluntary status commands.
+
 # Current Status
 Implemented bridge-first/chatless areas:
 
@@ -93,6 +97,8 @@ Implemented bridge-first/chatless areas:
 - Inventory refresh with icons and item tooltips.
 - Spellbook refresh.
 - Glyph refresh with icons and glyph tooltips.
+- Outfits refresh and actions through the bridge.
+- Outfit equip/replace without detailed `Equipping [item] ...` chat spam.
 - Custom Glyphs socket mapping and apply order.
 - Talent tab navigation stability after switching between tabs.
 - Automatic bot reconnect on login/reload for bots already present in the group or raid.
@@ -100,21 +106,20 @@ Implemented bridge-first/chatless areas:
 
 Kept intentionally:
 
-- Manual whisper/playerbot commands for diagnostics.
-- Outfits through the legacy path for now.
+- Manual whisper/playerbot commands for diagnostics, including `who`, `co ?`, `nc ?`, `ss ?` and similar state-inspection commands.
 - Gameplay write actions that still rely on existing playerbot commands.
+- Optional legacy fallback behavior only for debugging or compatibility.
 
 # Remaining Work
-The next logical step is now: **migrate Outfits to bridge-first**.
+The Outfits migration is now complete. The next step is final stabilization and cleanup.
 
 Planned follow-up work:
 
-- Add a structured `GET~OUTFITS~<bot>~<token>` flow in `mod-multibot-bridge`.
-- Replace the current Outfits chat parsing path in the addon with bridge responses.
-- Keep the old Outfits parser only as an optional legacy fallback while testing.
-- Continue regression testing login, `/reload`, large raid groups, Units, EveryBars, Stats, Inventory, Spellbook, Talents and Glyphs.
+- Regression test login, `/reload`, large raid groups, Units, EveryBars, Stats, Inventory, Spellbook, Talents, Glyphs and Outfits.
+- Verify that `MultiBot.allowLegacyChatFallback = false` prevents automatic legacy refresh spam on all migrated UI paths.
+- Keep manual diagnostic commands documented and functional, especially `who`, `co ?`, `nc ?` and `ss ?`.
 - Remove obsolete debug prints and dead legacy parser paths once the bridge-first behavior is fully stable.
-- Update screenshots and user documentation after the Outfits migration.
+- Update screenshots and user documentation after wider testing.
 
 ---
 
