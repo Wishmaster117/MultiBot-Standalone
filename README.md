@@ -1,126 +1,218 @@
-<img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/3ac43983-8767-4dd6-9a17-4548ede1e9d3" />
+<div align="center">
 
-# Breaking News
-MultiBot has been converted to a bridge-first, mostly chatless architecture.
+# ⚠️ MultiBot-Standalone is Deprecated ⚠️
 
-The addon now uses `mod-multibot-bridge` to request structured data from the server instead of relying on automatic legacy chat parsing for the main UI refresh paths. Roster, states, details, stats, inventory, spellbook, glyphs, outfits and related UI data are now refreshed through `MBOT GET~...` bridge requests when the bridge is available.
+### This repository is no longer the recommended installation source.
 
-Manual playerbot commands are still intentionally preserved for diagnostics and gameplay actions. Commands such as `who`, `co ?`, `nc ?`, `ss ?` and similar manual whispers still work so players can request information about a bot state when they explicitly want it.
+<br>
 
-Outfits have also been moved to the bridge-first path. Listing, creating/updating, resetting, equipping and replacing outfit sets no longer require automatic chat parsing, and the bridge suppresses the old detailed `Equipping [item] ...` spam while keeping a single readable equip/replace confirmation.
+<strong>The project has been split into two dedicated repositories:</strong>
 
-Legacy automatic chat fallback is disabled by default:
+<br><br>
 
-```lua
-MultiBot.allowLegacyChatFallback = false
-```
+<table>
+  <tr>
+    <th>Component</th>
+    <th>Repository</th>
+    <th>Purpose</th>
+  </tr>
+  <tr>
+    <td><strong>Client Addon</strong></td>
+    <td>
+      <a href="https://github.com/Wishmaster117/MultiBot-Chatless">
+        Wishmaster117/MultiBot-Chatless
+      </a>
+    </td>
+    <td>
+      World of Warcraft client addon installed in <code>Interface/AddOns</code>
+    </td>
+  </tr>
+  <tr>
+    <td><strong>AzerothCore Module</strong></td>
+    <td>
+      <a href="https://github.com/Wishmaster117/mod-multibot-bridge">
+        Wishmaster117/mod-multibot-bridge
+      </a>
+    </td>
+    <td>
+      Server-side bridge module installed in the AzerothCore <code>modules</code> directory
+    </td>
+  </tr>
+</table>
 
-Set it to `true` only for temporary debugging if you need to test the old chat-based fallback behavior.
+<br>
 
-# MultiBot
-MultiBot is a user interface addon for the AzerothCore `mod-playerbots` module by the Playerbots team: https://github.com/mod-playerbots/mod-playerbots.<br>
-Tested with American, German, French and Spanish 3.3.5 WotLK clients.
+<strong>Do not use this repository for new installations.</strong>
 
-This version also expects the companion server module `mod-multibot-bridge` to be installed if you want the new bridge-first/chatless UI behavior.
-
-# Installation
-
-## 1. Server-side bridge module
-1. Copy the `mod-multibot-bridge` folder into your AzerothCore modules directory, next to `mod-playerbots`:
-
-```text
-azerothcore-wotlk/modules/mod-multibot-bridge
-```
-
-2. Re-run CMake for your AzerothCore build if your workflow requires it.
-3. Rebuild the server.
-4. Start the server and check that `mod-multibot-bridge` is loaded.
-
-When the addon connects successfully, the server console should show messages similar to:
-
-```text
-MBOT HELLO
-MBOT HELLO_ACK
-MBOT PING
-MBOT PONG
-GET~ROSTER
-GET~STATES
-GET~DETAILS
-```
-
-## 2. Client-side addon
-1. Copy the addon files into a folder named `MultiBot` inside your World of Warcraft AddOns directory:
-
-```text
-World of Warcraft/Interface/AddOns/MultiBot
-```
-
-Example on Windows:
-
-```text
-DRIVE:\WowClientFolder\Interface\AddOns\MultiBot
-```
-
-2. Make sure the `.toc` file is directly inside the `MultiBot` folder. The addon should not be nested inside an extra directory such as `MultiBot/MultiBot/...`.
-3. Start World of Warcraft.
-4. Enable the addon on the character selection screen if needed.
-5. Log in and use `/multibot`, `/mbot`, `/mb`, or the minimap button.
-
-## 3. Recommended configuration
-For normal bridge-first usage, keep legacy automatic chat fallback disabled:
-
-```lua
-MultiBot.allowLegacyChatFallback = false
-```
-
-Only enable it temporarily for debugging:
-
-```lua
-MultiBot.allowLegacyChatFallback = true
-```
-
-# Use
-Start World of Warcraft and enter `/multibot`, `/mbot`, or `/mb` in the chat, or use the minimap button.
-
-The addon will automatically try to connect to `mod-multibot-bridge`. If the bridge is connected, the main UI refresh paths use structured bridge messages instead of legacy chat replies.
-
-Manual bot information commands remain available. You can still whisper/use commands such as `who`, `co ?`, `nc ?`, `ss ?` and similar playerbot diagnostics when you explicitly want to inspect a bot state. The chatless conversion only removes the automatic UI-refresh spam; it does not remove voluntary status commands.
-
-# Current Status
-Implemented bridge-first/chatless areas:
-
-- Bridge handshake: `HELLO`, `HELLO_ACK`, `PING`, `PONG`.
-- Roster refresh.
-- Bot states refresh.
-- Bot details refresh.
-- Stats refresh.
-- Inventory refresh with icons and item tooltips.
-- Spellbook refresh.
-- Glyph refresh with icons and glyph tooltips.
-- Outfits refresh and actions through the bridge.
-- Outfit equip/replace without detailed `Equipping [item] ...` chat spam.
-- Custom Glyphs socket mapping and apply order.
-- Talent tab navigation stability after switching between tabs.
-- Automatic bot reconnect on login/reload for bots already present in the group or raid.
-- Units bar refresh after adding a bot through AddClass.
-
-Kept intentionally:
-
-- Manual whisper/playerbot commands for diagnostics, including `who`, `co ?`, `nc ?`, `ss ?` and similar state-inspection commands.
-- Gameplay write actions that still rely on existing playerbot commands.
-- Optional legacy fallback behavior only for debugging or compatibility.
-
-# Remaining Work
-The Outfits migration is now complete. The next step is final stabilization and cleanup.
-
-Planned follow-up work:
-
-- Regression test login, `/reload`, large raid groups, Units, EveryBars, Stats, Inventory, Spellbook, Talents, Glyphs and Outfits.
-- Verify that `MultiBot.allowLegacyChatFallback = false` prevents automatic legacy refresh spam on all migrated UI paths.
-- Keep manual diagnostic commands documented and functional, especially `who`, `co ?`, `nc ?` and `ss ?`.
-- Remove obsolete debug prints and dead legacy parser paths once the bridge-first behavior is fully stable.
-- Update screenshots and user documentation after wider testing.
+</div>
 
 ---
 
-# Detailed Notice
+## 📌 What happened?
+
+`MultiBot-Standalone` was originally a combined repository containing both:
+
+- the **MultiBot client addon**
+- the **AzerothCore bridge module**
+
+To make installation, updates, automation, and maintenance easier for end users, the project has now been split into two separate repositories.
+
+This repository is kept only as a historical/legacy combined source.
+
+---
+
+# ✅ New Installation Method
+
+## 1. Install the client addon
+
+Use this repository:
+
+<div align="center">
+
+### 👉 [MultiBot-Chatless](https://github.com/Wishmaster117/MultiBot-Chatless)
+
+</div>
+
+Clone it into your World of Warcraft addon directory.
+
+```bash
+cd "World of Warcraft/Interface/AddOns"
+git clone https://github.com/Wishmaster117/MultiBot-Chatless.git MultiBot
+```
+
+The final folder structure must look like this:
+
+```text
+World of Warcraft/
+└── Interface/
+    └── AddOns/
+        └── MultiBot/
+            ├── MultiBot.toc
+            ├── Core/
+            ├── UI/
+            ├── Locales/
+            └── ...
+```
+
+> Important: the repository is named `MultiBot-Chatless`, but the local addon folder must be named `MultiBot`.
+
+---
+
+## 2. Install the AzerothCore bridge module
+
+Use this repository:
+
+<div align="center">
+
+### 👉 [mod-multibot-bridge](https://github.com/Wishmaster117/mod-multibot-bridge)
+
+</div>
+
+Clone it into your AzerothCore `modules` directory.
+
+```bash
+cd /path/to/azerothcore/modules
+git clone https://github.com/Wishmaster117/mod-multibot-bridge.git mod-multibot-bridge
+```
+
+The final folder structure must look like this:
+
+```text
+azerothcore/
+└── modules/
+    └── mod-multibot-bridge/
+        ├── conf/
+        └── src/
+```
+
+After installing the module, re-run CMake and rebuild your AzerothCore server.
+
+---
+
+# 🔄 Updating
+
+## Update the addon
+
+```bash
+cd "World of Warcraft/Interface/AddOns/MultiBot"
+git pull
+```
+
+## Update the AzerothCore module
+
+```bash
+cd /path/to/azerothcore/modules/mod-multibot-bridge
+git pull
+```
+
+Then rebuild your AzerothCore server if the module code changed.
+
+---
+
+# 🧩 Repository Split Summary
+
+| Old repository | Status |
+|---|---|
+| `Wishmaster117/MultiBot-Standalone` | Deprecated / legacy combined repository |
+
+| New repository | Usage |
+|---|---|
+| `Wishmaster117/MultiBot-Chatless` | Client addon |
+| `Wishmaster117/mod-multibot-bridge` | AzerothCore bridge module |
+
+---
+
+# ⚠️ For Existing Users
+
+If you previously cloned this repository directly, it is recommended to switch to the new split repositories.
+
+Remove the old addon folder and install the new addon repository:
+
+```bash
+cd "World of Warcraft/Interface/AddOns"
+rm -rf MultiBot
+git clone https://github.com/Wishmaster117/MultiBot-Chatless.git MultiBot
+```
+
+For the server module:
+
+```bash
+cd /path/to/azerothcore/modules
+rm -rf mod-multibot-bridge
+git clone https://github.com/Wishmaster117/mod-multibot-bridge.git mod-multibot-bridge
+```
+
+Then re-run CMake and rebuild AzerothCore.
+
+---
+
+# ❌ This Repository Will No Longer Be the Main Update Target
+
+Future active development should happen in:
+
+- [MultiBot-Chatless](https://github.com/Wishmaster117/MultiBot-Chatless)
+- [mod-multibot-bridge](https://github.com/Wishmaster117/mod-multibot-bridge)
+
+This repository may remain available for reference, history, or archival purposes only.
+
+---
+
+<div align="center">
+
+## ✅ Please use the new repositories
+
+### Client Addon
+
+<a href="https://github.com/Wishmaster117/MultiBot-Chatless">
+  https://github.com/Wishmaster117/MultiBot-Chatless
+</a>
+
+<br><br>
+
+### AzerothCore Bridge Module
+
+<a href="https://github.com/Wishmaster117/mod-multibot-bridge">
+  https://github.com/Wishmaster117/mod-multibot-bridge
+</a>
+
+</div>
